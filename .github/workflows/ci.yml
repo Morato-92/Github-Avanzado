@@ -1,0 +1,48 @@
+name: Pipeline CI (Develop)
+
+on:
+  pull_request:
+    branches: [ develop ]
+    types: [ opened, synchronize, reopened ]
+  push:
+    branches: [ develop ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update-readme:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Añadir linea de feature al README
+        run: |
+          REF_NAME="${{ github.head_ref || github.ref_name }}"
+          echo -e "\nAñadida feature: $REF_NAME" >> README.md
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add README.md
+          git commit -m "ci: actualizar README con feature $REF_NAME" || exit 0
+          git push
+
+  validate-dev:
+    needs: update-readme
+    runs-on: self-hosted
+    steps:
+      - name: Validar DEV_TOKEN contra variable local
+        shell: powershell
+        run: |
+          $secretDev = "${{ secrets.DEV_TOKEN }}"
+          $localDev = $env:LOCAL_DEV_TOKEN
+          if ($secretDev -and $localDev -and ($secretDev -eq $localDev)) {
+            Write-Host "¡ÉXITO! DEV_TOKEN coincide con LOCAL_DEV_TOKEN."
+            exit 0
+          } else {
+            Write-Host "ERROR: DEV_TOKEN NO coincide con LOCAL_DEV_TOKEN."
+            exit 1
+          }
