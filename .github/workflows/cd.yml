@@ -1,0 +1,54 @@
+name: Pipeline CD (Main)
+
+on:
+  pull_request:
+    branches: [ main ]
+    types: [ opened, synchronize, reopened ]
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  bump-version:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Incrementar version en README
+        run: |
+          DATE=$(date +'%Y-%m-%d %H:%M:%S')
+          if grep -q "AppVersion-" README.md; then
+            CURRENT_VER=$(grep -oP 'AppVersion-\K[0-9]+' README.md | tail -n 1)
+            NEW_VER=$((CURRENT_VER + 1))
+            sed -i "s/AppVersion-$CURRENT_VER/AppVersion-$NEW_VER ($DATE)/g" README.md
+          else
+            echo -e "\nAppVersion-1 ($DATE)" >> README.md
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add README.md
+          git commit -m "cd: incremento de versión en README" || exit 0
+          git push
+
+  validate-prod:
+    needs: bump-version
+    runs-on: self-hosted
+    steps:
+      - name: Validar PROD_TOKEN contra variable local
+        shell: powershell
+        run: |
+          $secretProd = "${{ secrets.PROD_TOKEN }}"
+          $localProd = $env:LOCAL_PROD_TOKEN
+          if ($secretProd -and $localProd -and ($secretProd -eq $localProd)) {
+            Write-Host "¡ÉXITO! PROD_TOKEN coincide con LOCAL_PROD_TOKEN."
+            exit 0
+          } else {
+            Write-Host "ERROR: PROD_TOKEN NO coincide con LOCAL_PROD_TOKEN."
+            exit 1
+          }
