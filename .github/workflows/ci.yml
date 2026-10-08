@@ -27,7 +27,8 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add README.md
-          git commit -m "ci: actualizar README con feature $REF_NAME" || exit 0
+          git commit -m "ci: actualizar README con feature $REF_NAME" || echo "Sin cambios"
+          git pull origin ${{ github.head_ref || github.ref_name }} --rebase
           git push origin HEAD:${{ github.head_ref || github.ref_name }}
 
   validate-dev:
